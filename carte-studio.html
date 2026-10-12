@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte Studio — Mon Affiche Frenchy</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<style>
+  :root{--bg:#f3ece6;--panel:#fbf7f3;--ink:#2b231d;--muted:#8a7a6c;--terra:#7d4c27;--line:#e2d5c9;--sans:"Segoe UI",system-ui,sans-serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+  .app{display:grid;grid-template-columns:320px 1fr;height:100%}
+  @media(max-width:860px){.app{grid-template-columns:1fr;height:auto}}
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow:auto}
+  .side h1{font-size:18px;margin:0 0 2px}.side .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .grp{margin-bottom:16px}.grp h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--terra);margin:0 0 8px}
+  input[type=text],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{border:none;background:var(--terra);color:#fff;padding:9px 13px;border-radius:9px;font-weight:600;cursor:pointer;font-size:14px}
+  .btn:hover{background:#633a1d}.btn.ghost{background:transparent;color:var(--terra);border:1.5px solid var(--terra)}.btn.sm{padding:6px 10px;font-size:13px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .results{list-style:none;margin:8px 0 0;padding:0;max-height:180px;overflow:auto}
+  .results li{padding:7px 9px;border:1px solid var(--line);border-radius:7px;margin-bottom:5px;cursor:pointer;font-size:12px;background:#fff}
+  .results li:hover{background:#efe3d8}
+  .swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .sw{border:2px solid var(--line);border-radius:9px;padding:6px;cursor:pointer;text-align:center;font-size:11px;color:var(--muted)}
+  .sw.active{border-color:var(--terra)}.sw .chip{height:30px;border-radius:6px;margin-bottom:4px}
+  label.fld{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);margin:6px 0}
+  input[type=color]{width:42px;height:28px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
+  .cwrap{display:flex;align-items:center;gap:7px}
+  .hex{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--ink);text-transform:uppercase;min-width:66px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff;width:76px}
+  input[type=range]{accent-color:var(--terra)}
+  .main{position:relative;min-height:70vh}#map{position:absolute;inset:0}
+  #crop{position:absolute;pointer-events:none;border:2px dashed rgba(125,76,39,.9);box-shadow:0 0 0 4000px rgba(243,236,230,.45);border-radius:2px}
+  .maplabel{position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:6px;font-size:11px;color:var(--muted);z-index:500}
+  .heart{cursor:grab;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .pvwrap{margin-top:10px;display:none}.pvwrap img{width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .maplibregl-ctrl-attrib{font-size:9px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <h1>Carte Studio</h1>
+    <div class="sub">Mon Affiche Frenchy — cartes personnalisées en PNG</div>
+
+    <div class="grp">
+      <h2>1 · Adresse / lieu</h2>
+      <div class="row"><input type="text" id="q" placeholder="Ex : 66 rue Clovis, Reims" autocomplete="off"><button class="btn sm" id="searchBtn">OK</button></div>
+      <ul class="results" id="results"></ul>
+      <div class="hint">Tapez l'adresse, choisissez dans la liste, puis déplacez le <b>cœur</b> sur la carte.</div>
+    </div>
+
+    <div class="grp">
+      <h2>2 · Couleur</h2>
+      <div class="swatches" id="swatches"></div>
+      <label class="fld">Fond <span class="cwrap"><input type="text" class="hex" id="hBg" value="#FFFFFF" maxlength="7"><input type="color" id="cBg" value="#ffffff"></span></label>
+      <label class="fld">Routes <span class="cwrap"><input type="text" class="hex" id="hLine" value="#2B2B2B" maxlength="7"><input type="color" id="cLine" value="#2b2b2b"></span></label>
+      <label class="fld">Eau (mer, rivières) <span class="cwrap"><input type="text" class="hex" id="hWater" value="#DFE7EC" maxlength="7"><input type="color" id="cWater" value="#dfe7ec"></span></label>
+      <label class="fld">Finesse des traits <input type="range" id="fine" min="0.4" max="1.6" step="0.05" value="1"></label>
+      <label class="fld">Afficher les noms de rues <input type="checkbox" id="labels"></label>
+    </div>
+
+    <div class="grp">
+      <h2>3 · Cœur</h2>
+      <label class="fld">Couleur <span class="cwrap"><input type="text" class="hex" id="hHeart" value="#E2342F" maxlength="7"><input type="color" id="cHeart" value="#e2342f"></span></label>
+      <label class="fld">Taille <input type="range" id="hSize" min="16" max="90" value="40"></label>
+      <button class="btn ghost sm" id="centerHeart">Recentrer le cœur</button>
+    </div>
+
+    <div class="grp">
+      <h2>4 · Format & export</h2>
+      <label class="fld">Format
+        <select id="ratio">
+          <option value="2:3" selected>Portrait 2:3 (A4/A5)</option>
+          <option value="3:4">Portrait 3:4</option>
+          <option value="1:1">Carré</option>
+          <option value="3:2">Paysage 3:2</option>
+        </select>
+      </label>
+      <label class="fld">Qualité
+        <select id="quality">
+          <option value="1600">Standard</option>
+          <option value="2200" selected>Haute</option>
+          <option value="3508">A4 impression (300 dpi)</option>
+          <option value="4961">A3 impression (300 dpi)</option>
+        </select>
+      </label>
+      <button class="btn" id="exportBtn" style="width:100%" disabled>Télécharger la carte (PNG)</button>
+      <div class="hint" id="exportHint">Chargement de la carte…</div>
+      <div class="pvwrap" id="pvwrap"><img id="pv" alt="aperçu"></div>
+    </div>
+    <div class="hint">Données © OpenStreetMap · fond OpenFreeMap</div>
+  </div>
+
+  <div class="main">
+    <div id="map"></div>
+    <div id="crop"></div>
+    <div class="maplabel">Déplacez / zoomez la carte · le cadre = ce qui sera exporté</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const STYLE="https://tiles.openfreemap.org/styles/positron";
+
+const THEMES=[
+  {name:"Bleu-gris",bg:"#5b7082",line:"#223040",water:"#4a5e6e"},
+  {name:"Beige",bg:"#efe6d6",line:"#6f4f33",water:"#d7c7b0"},
+  {name:"Noir & blanc",bg:"#ffffff",line:"#2b2b2b",water:"#e6e6e6"},
+  {name:"Terracotta",bg:"#efe3d8",line:"#7d4c27",water:"#e0cdbb"},
+  {name:"Sauge",bg:"#dfe6db",line:"#46543f",water:"#cdd8c7"},
+  {name:"Nuit",bg:"#182230",line:"#9fb0c4",water:"#101824"},
+  {name:"Gris & blanc",bg:"#ffffff",line:"#8a8a8a",water:"#ececec"},
+  {name:"Rose & blanc",bg:"#ffffff",line:"#d4879f",water:"#f5dde5"},
+  {name:"Marron & beige",bg:"#efe6d6",line:"#6f4a30",water:"#ddcdb8"},
+  {name:"Vert & blanc",bg:"#ffffff",line:"#5d7d5a",water:"#e4efe3"},
+  {name:"Gris béton",bg:"#bababa",line:"#545454",water:"#ffffff"},
+];
+let theme={bg:"#ffffff",line:"#2b2b2b",water:"#e6e6e6"};
+let labelsOn=false, heartSize=40, heartColor="#e2342f", styleReady=false, fine=1;
+
+const map=new maplibregl.Map({container:"map",style:STYLE,center:[2.3,48.86],zoom:13,attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),"top-left");
+
+function isWaterLayer(l){const sl=l["source-layer"]||"";return sl==="water"||sl==="waterway"||/water|ocean|sea|river|lake|marin/i.test(l.id);}
+function isCasing(l){return /casing|outline|bridge.*(case)/i.test(l.id);}
+function roadClass(l){const id=(l.id+" "+(l["source-layer"]||"")).toLowerCase();
+  if(/motorway|trunk|primary|rail|railway/.test(id))return"major";
+  if(/secondary|tertiary|main|aeroway/.test(id))return"mid";
+  return"minor";}
+function hexRgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function mix(a,b,t){const A=hexRgb(a),B=hexRgb(b);const c=A.map((v,i)=>Math.round(v+(B[i]-v)*t));return`rgb(${c[0]},${c[1]},${c[2]})`;}
+const BASE={major:[0.95,2.1,4.4,8],mid:[0.65,1.4,3.0,5.6],minor:[0.4,0.85,1.8,3.6]};
+const ZS=[8,12,16,19];
+function widthExpr(cls,f){const b=BASE[cls];return["interpolate",["linear"],["zoom"],ZS[0],b[0]*f,ZS[1],b[1]*f,ZS[2],b[2]*f,ZS[3],b[3]*f];}
+function interpWidth(b,z){if(z<=ZS[0])return b[0];if(z>=ZS[3])return b[3];for(let i=0;i<3;i++){if(z<=ZS[i+1]){const t=(z-ZS[i])/(ZS[i+1]-ZS[i]);return b[i]+(b[i+1]-b[i])*t;}}return b[3];}
+// épaisseur figée (pour l'export) = épaisseur à l'écran × facteur d'agrandissement
+function lineWidthValue(cls,z,scale){return interpWidth(BASE[cls],z)*fine*scale;}
+function roadColor(cls){ // léger dégradé : grands axes foncés, petites rues plus claires
+  if(cls==="major")return theme.line;
+  if(cls==="mid")return mix(theme.line,theme.bg,0.15);
+  return mix(theme.line,theme.bg,0.38);
+}
+function styleMap(m,ex){ // ex = {zoom,scale} pour figer l'épaisseur à l'export
+  if(!m.isStyleLoaded())return;
+  for(const l of m.getStyle().layers){
+    try{
+      if(l.type==="background") m.setPaintProperty(l.id,"background-color",theme.bg);
+      else if(l.type==="fill"){ m.setPaintProperty(l.id,"fill-color",isWaterLayer(l)?theme.water:theme.bg); m.setPaintProperty(l.id,"fill-opacity",1); }
+      else if(l.type==="fill-extrusion"){ m.setPaintProperty(l.id,"fill-extrusion-color",theme.bg); }
+      else if(l.type==="line"){
+        if(isWaterLayer(l)){ m.setPaintProperty(l.id,"line-color",theme.water); }
+        else if(isCasing(l)){ m.setLayoutProperty(l.id,"visibility","none"); } // supprime les contours épais
+        else { const cls=roadClass(l); m.setPaintProperty(l.id,"line-color",roadColor(cls));
+          m.setPaintProperty(l.id,"line-width", ex? lineWidthValue(cls,ex.zoom,ex.scale) : widthExpr(cls,fine)); }
+      }
+      else if(l.type==="symbol"){ m.setLayoutProperty(l.id,"visibility",labelsOn?"visible":"none"); if(labelsOn){ try{m.setPaintProperty(l.id,"text-color",theme.line);}catch(e){} try{m.setPaintProperty(l.id,"text-halo-color",theme.bg);}catch(e){} } }
+    }catch(e){}
+  }
+}
+function applyStyle(){ styleMap(map); }
+map.on("load",()=>{ applyStyle(); styleReady=true; $("#exportBtn").disabled=false; $("#exportHint").textContent="La carte exportée correspond au cadre pointillé."; layoutCrop(); map.resize(); });
+
+/* ---- Cœur ---- */
+function heartSVG(size,color){return `<svg width="${size}" height="${size}" viewBox="0 0 32 29" xmlns="http://www.w3.org/2000/svg"><path d="M16 29S2 19.5 2 9.8C2 4.9 5.9 1 10.8 1 13.4 1 15.6 2.5 16 4.2 16.4 2.5 18.6 1 21.2 1 26.1 1 30 4.9 30 9.8 30 19.5 16 29 16 29Z" fill="${color}"/></svg>`;}
+function heartEl(){const d=document.createElement("div");d.className="heart";d.innerHTML=heartSVG(heartSize,heartColor);return d;}
+let heart=new maplibregl.Marker({element:heartEl(),draggable:true,anchor:"bottom"}).setLngLat([2.3,48.86]).addTo(map);
+function refreshHeart(){const m=heart.getLngLat();heart.remove();heart=new maplibregl.Marker({element:heartEl(),draggable:true,anchor:"bottom"}).setLngLat(m).addTo(map);}
+$("#centerHeart").onclick=()=>heart.setLngLat(map.getCenter());
+
+/* ---- Cadre ---- */
+function ratioVals(){const[a,b]=$("#ratio").value.split(":").map(Number);return a/b;}
+function layoutCrop(){const main=$(".main"),cv=$("#crop"),W=main.clientWidth,H=main.clientHeight,m=28;
+  const aw=W-2*m,ah=H-2*m,r=ratioVals();let w=aw,h=w/r;if(h>ah){h=ah;w=h*r;}
+  cv.style.width=w+"px";cv.style.height=h+"px";cv.style.left=(W-w)/2+"px";cv.style.top=(H-h)/2+"px";}
+window.addEventListener("resize",()=>{layoutCrop();map.resize();});
+$("#ratio").onchange=layoutCrop;
+
+/* ---- Recherche (Nominatim) + suggestions ---- */
+let acTimer=null;
+$("#searchBtn").onclick=()=>doSearch($("#q").value.trim());
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"){clearTimeout(acTimer);doSearch($("#q").value.trim());}});
+$("#q").addEventListener("input",()=>{clearTimeout(acTimer);const v=$("#q").value.trim();if(v.length<3){$("#results").innerHTML="";return;}acTimer=setTimeout(()=>doSearch(v),350);});
+async function doSearch(q){if(!q)return;const ul=$("#results");ul.innerHTML="<li>Recherche…</li>";
+  try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=6&q="+encodeURIComponent(q),{headers:{"Accept-Language":"fr"}});
+    const data=await r.json();ul.innerHTML="";if(!data.length){ul.innerHTML="<li>Aucun résultat</li>";return;}
+    data.forEach(d=>{const li=document.createElement("li");li.textContent=d.display_name;
+      li.onclick=()=>{map.flyTo({center:[+d.lon,+d.lat],zoom:15});heart.setLngLat([+d.lon,+d.lat]);ul.innerHTML="";$("#q").value=d.display_name;};ul.appendChild(li);});
+  }catch(e){ul.innerHTML="<li>Erreur réseau</li>";}}
+
+/* ---- UI couleurs ---- */
+function setHex(id,v){const el=$(id);if(el)el.value=v.toUpperCase();}
+const sw=$("#swatches");
+THEMES.forEach((t,i)=>{const d=document.createElement("div");d.className="sw"+(i===2?" active":"");
+  d.innerHTML=`<div class="chip" style="background:${t.bg};border-bottom:5px solid ${t.line}"></div>${t.name}`;
+  d.onclick=()=>{[...sw.children].forEach(c=>c.classList.remove("active"));d.classList.add("active");
+    theme={bg:t.bg,line:t.line,water:t.water};
+    $("#cBg").value=t.bg;$("#cLine").value=t.line;$("#cWater").value=t.water;
+    setHex("#hBg",t.bg);setHex("#hLine",t.line);setHex("#hWater",t.water);applyStyle();};
+  sw.appendChild(d);});
+// sélecteur de couleur -> met à jour le champ hex + la carte
+$("#cBg").oninput=()=>{theme.bg=$("#cBg").value;setHex("#hBg",theme.bg);applyStyle();};
+$("#cLine").oninput=()=>{theme.line=$("#cLine").value;setHex("#hLine",theme.line);applyStyle();};
+$("#cWater").oninput=()=>{theme.water=$("#cWater").value;setHex("#hWater",theme.water);applyStyle();};
+// champ hex tapé -> met à jour le sélecteur + la carte
+function wireHex(hexId,colId,set){const h=$(hexId);h.addEventListener("input",()=>{let v=h.value.trim();if(!v.startsWith("#"))v="#"+v;if(/^#[0-9a-fA-F]{6}$/.test(v)){$(colId).value=v;set(v);applyStyle();}});}
+wireHex("#hBg","#cBg",v=>theme.bg=v);
+wireHex("#hLine","#cLine",v=>theme.line=v);
+wireHex("#hWater","#cWater",v=>theme.water=v);
+$("#fine").oninput=()=>{fine=parseFloat($("#fine").value);applyStyle();};
+$("#labels").onchange=()=>{labelsOn=$("#labels").checked;applyStyle();};
+$("#cHeart").oninput=()=>{heartColor=$("#cHeart").value;setHex("#hHeart",heartColor);refreshHeart();};
+$("#hHeart").addEventListener("input",()=>{let v=$("#hHeart").value.trim();if(!v.startsWith("#"))v="#"+v;if(/^#[0-9a-fA-F]{6}$/.test(v)){$("#cHeart").value=v;heartColor=v;refreshHeart();}});
+$("#hSize").oninput=()=>{heartSize=+$("#hSize").value;refreshHeart();};
+
+/* ---- Export haute résolution (carte hors écran) ---- */
+$("#exportBtn").onclick=async()=>{
+  const btn=$("#exportBtn");btn.disabled=true;btn.textContent="Génération…";
+  try{
+    const mapRect=$("#map").getBoundingClientRect(),cropRect=$("#crop").getBoundingClientRect();
+    const cropLeft=cropRect.left-mapRect.left, cropTop=cropRect.top-mapRect.top;
+    const z0=map.getZoom();                                      // MÊME zoom que l'écran
+    const cssW=cropRect.width, cssH=cropRect.height, longSide=parseInt($("#quality").value,10);
+    const aspect=cssW/cssH;
+    let W,H; if(cssW>=cssH){W=longSide;H=Math.round(W/aspect);} else {H=longSide;W=Math.round(H*aspect);}
+    const ratio=W/cssW;                                          // densité de pixels pour la haute résolution
+    const MAXT=3400;                                             // limite sûre par rendu (contrainte GPU)
+    const cols=Math.max(1,Math.ceil(W/MAXT)), rows=Math.max(1,Math.ceil(H/MAXT));
+
+    const final=document.createElement("canvas");final.width=W;final.height=H;const ctx=final.getContext("2d");
+    const tCssW=cssW/cols, tCssH=cssH/rows;
+    for(let gy=0;gy<rows;gy++){
+      for(let gx=0;gx<cols;gx++){
+        const tc=map.unproject([cropLeft+(gx+0.5)*tCssW, cropTop+(gy+0.5)*tCssH]); // centre géo de la tuile
+        const hidden=document.createElement("div");hidden.style.cssText=`position:fixed;left:-99999px;top:0;width:${Math.round(tCssW)}px;height:${Math.round(tCssH)}px`;document.body.appendChild(hidden);
+        const m2=new maplibregl.Map({container:hidden,style:STYLE,interactive:false,attributionControl:false,preserveDrawingBuffer:true,fadeDuration:0,center:tc,zoom:z0});
+        await new Promise(res=>m2.on("load",res));
+        if(typeof m2.setPixelRatio==="function"){ m2.setPixelRatio(ratio); m2.resize(); }
+        styleMap(m2);                                            // style identique à l'écran
+        await new Promise(res=>m2.once("idle",res));
+        await new Promise(res=>setTimeout(res,300));
+        const gl=m2.getCanvas();
+        const dx=Math.round(gx*W/cols), dy=Math.round(gy*H/rows);
+        const dw=Math.round((gx+1)*W/cols)-dx, dh=Math.round((gy+1)*H/rows)-dy;
+        ctx.drawImage(gl,0,0,gl.width,gl.height, dx,dy,dw,dh);
+        m2.remove();hidden.remove();
+      }
+    }
+    // cœur (position géographique projetée sur l'image finale)
+    const hpm=map.project(heart.getLngLat());
+    const hx=(hpm.x-cropLeft)*ratio, hy=(hpm.y-cropTop)*ratio, hs=heartSize*ratio;
+    const svg=heartSVG(hs,heartColor);const burl=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));
+    await new Promise(res=>{const im=new Image();im.onload=()=>{ctx.drawImage(im,hx-hs/2,hy-hs,hs,hs);res();};im.onerror=res;im.src=burl;});
+    URL.revokeObjectURL(burl);
+
+    final.toBlob(b=>{const u=URL.createObjectURL(b);$("#pv").src=u;$("#pvwrap").style.display="block";
+      const a=document.createElement("a");a.href=u;a.download="carte-"+($("#q").value.trim().replace(/[^\w]+/g,"-").slice(0,30)||"affiche")+".png";
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);},"image/png");
+  }catch(e){alert("Erreur pendant la génération : "+e.message);}
+  btn.disabled=false;btn.textContent="Télécharger la carte (PNG)";
+};
+</script>
+</body>
+</html>
