@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte du Ciel — Mon Affiche Frenchy</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&family=Cormorant+Garamond:wght@400;500;600&family=Playfair+Display:wght@400;500;600&family=Montserrat:wght@300;400;500&family=Great+Vibes&display=swap">
+<style>
+  :root{--bg:#f3ece6;--panel:#fbf7f3;--ink:#2b231d;--muted:#8a7a6c;--terra:#7d4c27;--line:#e2d5c9;--sans:"Segoe UI",system-ui,sans-serif;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+  .app{display:grid;grid-template-columns:330px 1fr;height:100%}
+  @media(max-width:900px){.app{grid-template-columns:1fr;height:auto}}
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow:auto}
+  h1{font-size:18px;margin:0 0 2px}.sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .grp{margin-bottom:15px;border-top:1px solid var(--line);padding-top:11px}.grp:first-of-type{border-top:none;padding-top:0}
+  .grp h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--terra);margin:0 0 8px}
+  input[type=text],input[type=date],input[type=time],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{border:none;background:var(--terra);color:#fff;padding:9px 13px;border-radius:9px;font-weight:600;cursor:pointer;font-size:14px}
+  .btn:hover{background:#633a1d}.btn.sm{padding:6px 10px;font-size:13px}.btn:disabled{opacity:.5;cursor:not-allowed}
+  label.fld{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);margin:7px 0}
+  label.fld input,label.fld select{max-width:160px}
+  .results{list-style:none;margin:8px 0 0;padding:0;max-height:160px;overflow:auto}
+  .results li{padding:7px 9px;border:1px solid var(--line);border-radius:7px;margin-bottom:5px;cursor:pointer;font-size:12px;background:#fff}
+  .results li:hover{background:#efe3d8}
+  .swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .sw{border:2px solid var(--line);border-radius:9px;padding:6px;cursor:pointer;text-align:center;font-size:11px;color:var(--muted)}
+  .sw.active{border-color:var(--terra)}.sw .chip{height:26px;border-radius:6px;margin-bottom:4px}
+  input[type=color]{width:40px;height:26px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
+  input[type=range]{accent-color:var(--terra);flex:1}
+  .sgrp{display:flex;align-items:center;gap:8px;max-width:210px;flex:1;justify-content:flex-end}
+  .sgrp input[type=range]{flex:1}
+  .val{font-size:12px;min-width:42px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+  .chk{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.chk label{display:flex;align-items:center;gap:4px}
+  .main{position:relative;min-height:70vh;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+  #stage{box-shadow:0 2px 16px rgba(0,0,0,.18)}
+  #cv{display:block;max-width:100%;max-height:82vh;height:auto}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .status{font-size:12px;color:var(--muted);padding:6px 0}
+  .projlist{display:flex;flex-direction:column;gap:5px;margin-top:8px;max-height:220px;overflow:auto}
+  .proj{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:13px}
+  .proj:hover{background:#efe3d8}.proj.cur{border-color:var(--terra);background:#f3e7db}
+  .proj .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .proj .dt{font-size:11px;color:var(--muted)}
+  .proj .del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <h1>Carte du Ciel</h1>
+    <div class="sub">Mon Affiche Frenchy — position réelle des étoiles, export PNG</div>
+
+    <div class="grp">
+      <h2>1 · Lieu</h2>
+      <div class="row"><input type="text" id="q" placeholder="Ex : Antibes, France"><button class="btn sm" id="searchBtn">OK</button></div>
+      <ul class="results" id="results"></ul>
+      <div class="hint" id="placeHint"></div>
+    </div>
+
+    <div class="grp">
+      <h2>2 · Date & heure</h2>
+      <label class="fld">Date <input type="date" id="date"></label>
+      <label class="fld">Heure <input type="time" id="time" value="22:00"></label>
+      <div class="chk"><label><input type="checkbox" id="utcAuto" checked> calcul automatique hiver/été selon le lieu</label></div>
+      <label class="fld">Décalage UTC <input type="number" id="utc" step="0.5" value="1"></label>
+      <div class="hint" id="tzHint">Le décalage est déterminé automatiquement selon le lieu et la date (heure locale saisie).</div>
+    </div>
+
+    <div class="grp">
+      <h2>3 · Style du ciel</h2>
+      <div class="hint" style="margin:0 0 6px">Préréglages (1 clic) :</div>
+      <div class="row" id="presets" style="margin-bottom:10px"></div>
+      <div class="swatches" id="swatches"></div>
+      <label class="fld">Ciel (centre) <input type="color" id="cSky" value="#16263f"></label>
+      <label class="fld">Ciel (bords) <input type="color" id="cEdge" value="#0a1324"></label>
+      <label class="fld">Étoiles <input type="color" id="cStar" value="#ffffff"></label>
+      <label class="fld">Taille étoiles <span class="sgrp"><input type="range" id="starSize" min="0.5" max="2.2" step="0.1" value="1"><span class="val" id="vStar"></span></span></label>
+      <label class="fld">Épaisseur des lignes <span class="sgrp"><input type="range" id="lineW" min="0.3" max="3" step="0.1" value="1"><span class="val" id="vLine"></span></span></label>
+      <div class="chk"><label><input type="checkbox" id="showLines" checked> lignes des constellations</label><label><input type="checkbox" id="showNames"> noms des constellations</label></div>
+    </div>
+
+    <div class="grp">
+      <h2>4 · Texte</h2>
+      <label class="fld" style="flex-direction:column;align-items:stretch">Titre <input type="text" id="tTitle" value="CLARA & ENZO"></label>
+      <label class="fld" style="flex-direction:column;align-items:stretch">Sous-titre <input type="text" id="tSub" value="24 AVRIL 2026 | ANTIBES"></label>
+      <div class="chk" style="margin:4px 0 8px"><label><input type="checkbox" id="subAuto"> sous-titre automatique (date + lieu)</label></div>
+      <label class="fld">Police <select id="titleFont">
+        <option value="Jost">Jost (fin)</option>
+        <option value="Montserrat">Montserrat</option>
+        <option value="Cormorant Garamond">Cormorant (serif)</option>
+        <option value="Playfair Display">Playfair (serif chic)</option>
+        <option value="Great Vibes">Great Vibes (manuscrit)</option>
+      </select></label>
+      <label class="fld">Taille du bloc <span class="sgrp"><input type="range" id="textSize" min="60" max="160" value="100"><span class="val" id="vText"></span></span></label>
+      <label class="fld">Position verticale <span class="sgrp"><input type="range" id="textY" min="50" max="95" value="84"><span class="val" id="vTextY"></span></span></label>
+      <div class="chk"><label><input type="checkbox" id="showCoords" checked> afficher les coordonnées</label><label><input type="checkbox" id="showText" checked> afficher le texte</label></div>
+    </div>
+
+    <div class="grp">
+      <h2>Image de fond (optionnel)</h2>
+      <div class="row">
+        <button class="btn sm" id="loadBg">Charger une image</button>
+        <input type="file" id="bgFile" accept="image/*" hidden>
+        <button class="btn sm" id="clearBg" style="background:transparent;color:var(--terra);border:1.5px solid var(--terra)">Retirer</button>
+      </div>
+      <label class="fld">Intensité de l'image <span class="sgrp"><input type="range" id="bgInt" min="0" max="100" value="85"><span class="val" id="vInt"></span></span></label>
+      <label class="fld">Zoom <span class="sgrp"><input type="range" id="bgZoom" min="100" max="400" value="100"><span class="val" id="vZoom"></span></span></label>
+      <label class="fld">Position horizontale <span class="sgrp"><input type="range" id="bgX" min="0" max="100" value="50"><span class="val" id="vX"></span></span></label>
+      <label class="fld">Position verticale <span class="sgrp"><input type="range" id="bgY" min="0" max="100" value="50"><span class="val" id="vY"></span></span></label>
+      <label class="fld">Fondu sombre (bas) <span class="sgrp"><input type="range" id="bgDark" min="0" max="70" value="38"><span class="val" id="vDark"></span></span></label>
+      <div class="hint">Idéale : une photo de voie lactée, de ciel ou de paysage. Les étoiles et constellations se superposent par-dessus.</div>
+    </div>
+
+    <div class="grp">
+      <h2>5 · Format & export</h2>
+      <label class="fld">Format
+        <select id="ratio"><option value="2:3" selected>Portrait 2:3 (A4/A5)</option><option value="3:4">Portrait 3:4</option><option value="1:1">Carré</option></select>
+      </label>
+      <label class="fld">Qualité <select id="quality"><option value="1600">Standard</option><option value="2000" selected>Haute</option><option value="3508">A4 300 dpi</option><option value="4961">A3 300 dpi</option></select></label>
+      <div class="chk" style="margin-bottom:8px"><label><input type="checkbox" id="transparent"> fond transparent (juste le ciel)</label></div>
+      <button class="btn" id="exportBtn" style="width:100%">Télécharger le PNG</button>
+    </div>
+
+    <div class="grp">
+      <h2>Mes affiches (clients)</h2>
+      <div class="row"><input type="text" id="projName" placeholder="Nom du client / de l'affiche"><button class="btn sm" id="projSave">Enregistrer</button></div>
+      <div class="status" id="projStatus"></div>
+      <div class="projlist" id="projList"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn sm" id="projExport" style="background:transparent;color:var(--terra);border:1.5px solid var(--terra)">Exporter (fichier)</button>
+        <button class="btn sm" id="projImport" style="background:transparent;color:var(--terra);border:1.5px solid var(--terra)">Importer</button>
+        <input type="file" id="projFile" accept="application/json,.json" hidden>
+      </div>
+      <div class="hint" id="projHint">Chaque affiche est enregistrée dans le navigateur et se met à jour automatiquement quand tu la modifies.</div>
+    </div>
+    <div class="status" id="status">Chargement du catalogue d'étoiles…</div>
+    <div class="hint">Données : étoiles & constellations © d3-celestial / OpenStreetMap</div>
+  </div>
+
+  <div class="main"><div id="stage"><canvas id="cv"></canvas></div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tz-lookup@6.1.25/tz.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const cv=$("#cv"), ctx=cv.getContext("2d");
+let CW=800,CH=1200;
+let STARS=[], LINES=[], NAMES=[];
+let place={lat:43.5804,lng:7.1225,name:"Antibes"};
+const DEG=Math.PI/180;
+
+const THEMES=[
+  {name:"Bleu nuit",sky:"#16263f",edge:"#0a1324",star:"#ffffff"},
+  {name:"Noir",sky:"#1a1a1a",edge:"#000000",star:"#ffffff"},
+  {name:"Bleu encre",sky:"#1d2b50",edge:"#0b1430",star:"#eef2ff"},
+  {name:"Ardoise",sky:"#263238",edge:"#121a1f",star:"#eceff1"},
+  {name:"Prune",sky:"#2a1830",edge:"#140a18",star:"#f3e9f5"},
+  {name:"Vert sapin",sky:"#13302a",edge:"#07140f",star:"#eaf5ef"},
+];
+let theme={sky:"#16263f",edge:"#0a1324",star:"#ffffff"};
+let bgImg=null;
+let curId=null, curName="", loading=false, autoTimer=null;
+
+/* ====== Chargement des données ====== */
+(async()=>{
+  try{
+    const [s,l,n]=await Promise.all([
+      fetch("https://cdn.jsdelivr.net/gh/ofrohn/d3-celestial@master/data/stars.6.json").then(r=>r.json()),
+      fetch("https://cdn.jsdelivr.net/gh/ofrohn/d3-celestial@master/data/constellations.lines.json").then(r=>r.json()),
+      fetch("https://cdn.jsdelivr.net/gh/ofrohn/d3-celestial@master/data/constellations.json").then(r=>r.json())
+    ]);
+    STARS=s.features.map(f=>({ra:f.geometry.coordinates[0],dec:f.geometry.coordinates[1],mag:f.properties.mag}));
+    LINES=[];
+    l.features.forEach(f=>{const g=f.geometry;const parts=g.type==="MultiLineString"?g.coordinates:[g.coordinates];
+      parts.forEach(seg=>LINES.push(seg.map(c=>({ra:c[0],dec:c[1]}))));});
+    NAMES=n.features.map(f=>({ra:f.geometry.coordinates[0],dec:f.geometry.coordinates[1],fr:(f.properties.fr||f.properties.name)}));
+    $("#status").textContent=STARS.length+" étoiles · "+LINES.length+" tracés de constellations";
+    render();
+  }catch(e){ $("#status").textContent="Erreur de chargement des étoiles (vérifiez la connexion)."; }
+})();
+
+/* ====== Astronomie ====== */
+/* ====== Fuseau horaire automatique (hiver/été) ====== */
+function tzOffsetHours(tz,date){try{const u=new Date(date.toLocaleString('en-US',{timeZone:'UTC'}));const t=new Date(date.toLocaleString('en-US',{timeZone:tz}));return Math.round((t-u)/3600000*2)/2;}catch(e){return null;}}
+function autoUTC(){
+  if(!$("#utcAuto").checked) return;
+  if(typeof tzlookup==="undefined"){ $("#tzHint").textContent="Fuseau auto indisponible — réglez le décalage à la main (France : 1 hiver, 2 été)."; return; }
+  try{
+    const tz=tzlookup(place.lat,place.lng);
+    const d=new Date(($("#date").value||"2026-01-01")+"T"+($("#time").value||"22:00")+":00Z");
+    const off=tzOffsetHours(tz,d);
+    if(off!=null){ $("#utc").value=off; $("#tzHint").textContent="Fuseau détecté : "+tz+" · UTC"+(off>=0?"+":"")+off+" (hiver/été géré automatiquement)"; }
+  }catch(e){}
+}
+function recalc(){ autoUTC(); if(typeof autoSub==="function") autoSub(); render(); }
+
+function norm360(x){x%=360;return x<0?x+360:x;}
+function lstDeg(){
+  const d=new Date($("#date").value+"T"+($("#time").value||"22:00")+":00Z");
+  if(isNaN(d)) return 0;
+  const utcMs=d.getTime()-parseFloat($("#utc").value||0)*3600000;
+  const jd=utcMs/86400000+2440587.5, T=jd-2451545.0;
+  const gmst=280.46061837+360.98564736629*T;
+  return norm360(gmst+place.lng);
+}
+function altaz(ra,dec,lst,lat){
+  const H=(lst-ra)*DEG, d=dec*DEG, p=lat*DEG;
+  const sinAlt=Math.sin(d)*Math.sin(p)+Math.cos(d)*Math.cos(p)*Math.cos(H);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)));
+  let A=Math.atan2(Math.sin(H), Math.cos(H)*Math.sin(p)-Math.tan(d)*Math.cos(p));
+  A=Math.PI-A;                                   // azimut depuis le Nord
+  return {alt:alt/DEG, az:A/DEG};
+}
+function project(alt,az,W,H){
+  const R=0.5*Math.hypot(W,H)*1.02;              // horizon circonscrit le rectangle
+  const z=(90-alt)/90;                            // distance zénithale normalisée
+  const r=z*R, a=az*DEG;
+  return {x:W/2 - r*Math.sin(a), y:H/2 - r*Math.cos(a)};  // Nord en haut, Est à gauche (vue vers le ciel)
+}
+
+/* ====== Rendu ====== */
+function setCanvasSize(){const[a,b]=$("#ratio").value.split(":").map(Number);const base=900;if(a>=b){CW=base;CH=Math.round(base*b/a);}else{CH=base;CW=Math.round(base*a/b);}cv.width=CW;cv.height=CH;render();}
+function drawSky(c,W,H){
+  if($("#transparent").checked) return;          // fond transparent : on ne peint rien
+  const g=c.createRadialGradient(W/2,H*0.45,0,W/2,H*0.5,Math.hypot(W,H)*0.6);
+  g.addColorStop(0,theme.sky);g.addColorStop(1,theme.edge);
+  c.fillStyle=g;c.fillRect(0,0,W,H);
+  if(bgImg){
+    const z=parseInt($("#bgZoom").value,10)/100;
+    const s=Math.max(W/bgImg.width,H/bgImg.height)*z,w=bgImg.width*s,h=bgImg.height*s;
+    const dx=(W-w)*(parseInt($("#bgX").value,10)/100), dy=(H-h)*(parseInt($("#bgY").value,10)/100);
+    c.save();c.globalAlpha=parseInt($("#bgInt").value,10)/100;c.drawImage(bgImg,dx,dy,w,h);c.restore();
+    // vignette : fond l'image dans les bords (couleur du ciel)
+    const v=c.createRadialGradient(W/2,H*0.45,Math.min(W,H)*0.25,W/2,H*0.5,Math.hypot(W,H)*0.62);
+    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(1,theme.edge);
+    c.save();c.globalAlpha=0.5;c.fillStyle=v;c.fillRect(0,0,W,H);c.restore();
+  }
+  // fondu sombre en bas (lisibilité du texte)
+  const dk=parseInt($("#bgDark").value,10)/100;
+  if(dk>0){ const bg2=c.createLinearGradient(0,H*(1-dk),0,H);bg2.addColorStop(0,"rgba(0,0,0,0)");bg2.addColorStop(1,theme.edge);c.fillStyle=bg2;c.fillRect(0,H*(1-dk),W,H*dk); }
+}
+function render(){ draw(ctx,CW,CH,1); if(typeof scheduleAutosave==="function") scheduleAutosave(); }
+function draw(c,W,H,s){
+  c.clearRect(0,0,W,H);
+  const lst=lstDeg(), lat=place.lat;
+  drawSky(c,W,H);
+  const posStar=STARS.map(st=>{const aa=altaz(st.ra,st.dec,lst,lat);return aa.alt>=-1?{...project(aa.alt,aa.az,W,H),mag:st.mag,alt:aa.alt}:null;});
+  // lignes des constellations
+  if($("#showLines").checked){
+    c.strokeStyle="rgba(255,255,255,0.32)";c.lineWidth=0.6*(W/600)*parseFloat($("#lineW").value||1);c.lineJoin="round";
+    LINES.forEach(seg=>{
+      c.beginPath();let pen=false;
+      for(const pt of seg){const aa=altaz(pt.ra,pt.dec,lst,lat);
+        if(aa.alt>=0){const p=project(aa.alt,aa.az,W,H);if(pen)c.lineTo(p.x,p.y);else{c.moveTo(p.x,p.y);pen=true;}}
+        else pen=false;}
+      c.stroke();
+    });
+  }
+  // étoiles
+  const sf=(W/600)*parseFloat($("#starSize").value);
+  c.fillStyle=theme.star;
+  for(const p of posStar){ if(!p)continue; if(p.x<-5||p.x>W+5||p.y<-5||p.y>H+5)continue;
+    const r=Math.max(0.35,(6.4-p.mag)*0.42)*sf;
+    if(p.mag<2.2){c.save();c.shadowColor=theme.star;c.shadowBlur=r*2.5;c.beginPath();c.arc(p.x,p.y,r,0,7);c.fill();c.restore();}
+    else{c.beginPath();c.arc(p.x,p.y,r,0,7);c.fill();}
+  }
+  // noms des constellations
+  if($("#showNames").checked && NAMES.length){
+    c.save();c.fillStyle="rgba(255,255,255,0.5)";c.textAlign="center";c.textBaseline="middle";
+    c.font="400 "+Math.round(W*0.016)+"px 'Jost',sans-serif";
+    for(const nm of NAMES){const aa=altaz(nm.ra,nm.dec,lst,lat);if(aa.alt<6)continue;const p=project(aa.alt,aa.az,W,H);if(p.x<W*0.04||p.x>W*0.96||p.y<W*0.04||p.y>H*0.8)continue;c.fillText((nm.fr||"").toUpperCase(),p.x,p.y);}
+    c.restore();
+  }
+  // texte
+  if($("#showText").checked) drawText(c,W,H);
+}
+function drawStarShape(c,cx,cy,r){c.beginPath();for(let i=0;i<10;i++){const a=Math.PI/5*i-Math.PI/2,rr=(i%2)?r*0.45:r;c.lineTo(cx+rr*Math.cos(a),cy+rr*Math.sin(a));}c.closePath();c.fill();}
+function drawSep(c,cx,y,W,ts,type){
+  if(type==="none")return;
+  c.save();c.strokeStyle=theme.star;c.fillStyle=theme.star;c.globalAlpha=0.85;c.lineWidth=W*0.0015;
+  if(type==="line"){c.beginPath();c.moveTo(cx-W*0.06*ts,y);c.lineTo(cx+W*0.06*ts,y);c.stroke();}
+  else if(type==="dot"){c.beginPath();c.arc(cx,y,W*0.004*ts,0,7);c.fill();}
+  else if(type==="star"){drawStarShape(c,cx,y,W*0.013*ts);}
+  c.restore();
+}
+function drawText(c,W,H){
+  c.save();c.textAlign="center";c.fillStyle=theme.star;
+  const font=$("#titleFont").value, ts=parseInt($("#textSize").value,10)/100;
+  const cx=W/2; let y=H*(parseInt($("#textY").value,10)/100);
+  c.shadowColor="rgba(0,0,0,.35)";c.shadowBlur=W*0.01;
+  c.font="500 "+Math.round(W*0.052*ts)+"px '"+font+"',sans-serif";
+  c.fillText($("#tTitle").value||"", cx, y);
+  y+=W*0.05*ts;
+  c.font="300 "+Math.round(W*0.022*ts)+"px '"+font+"',sans-serif";
+  c.fillText(spaced(($("#tSub").value||"").toUpperCase()), cx, y);
+  if($("#showCoords").checked){ y+=W*0.03*ts;
+    c.font="300 "+Math.round(W*0.018*ts)+"px '"+font+"',sans-serif";
+    c.fillText(coordStr(), cx, y);
+  }
+  c.restore();
+}
+function spaced(t){return t.split("").join(" ");}
+function coordStr(){
+  const la=place.lat, lo=place.lng;
+  return Math.abs(la).toFixed(6)+"°"+(la>=0?"N":"S")+", "+Math.abs(lo).toFixed(6)+"°"+(lo>=0?"E":"O");
+}
+
+/* ====== UI ====== */
+const sw=$("#swatches");
+THEMES.forEach((t,i)=>{const d=document.createElement("div");d.className="sw"+(i===0?" active":"");
+  d.innerHTML=`<div class="chip" style="background:radial-gradient(circle at 50% 40%, ${t.sky}, ${t.edge})"></div>${t.name}`;
+  d.onclick=()=>{[...sw.children].forEach(c=>c.classList.remove("active"));d.classList.add("active");theme={sky:t.sky,edge:t.edge,star:t.star};$("#cSky").value=t.sky;$("#cEdge").value=t.edge;$("#cStar").value=t.star;render();};
+  sw.appendChild(d);});
+$("#cSky").oninput=()=>{theme.sky=$("#cSky").value;render();};
+$("#cEdge").oninput=()=>{theme.edge=$("#cEdge").value;render();};
+$("#cStar").oninput=()=>{theme.star=$("#cStar").value;render();};
+["#starSize","#lineW","#showLines","#showNames","#showCoords","#showText","#tTitle","#tSub","#utc","#bgInt","#bgZoom","#bgX","#bgY","#bgDark","#titleFont","#textSize","#textY","#transparent"].forEach(id=>{const el=$(id);el.addEventListener("input",render);el.addEventListener("change",render);});
+[["#bgInt","#vInt"],["#bgZoom","#vZoom"],["#bgX","#vX"],["#bgY","#vY"],["#bgDark","#vDark"],["#textSize","#vText"],["#textY","#vTextY"]].forEach(([s,v])=>{const f=()=>$(v).textContent=$(s).value+" %";$(s).addEventListener("input",f);f();});
+[["#starSize","#vStar"],["#lineW","#vLine"]].forEach(([s,v])=>{const f=()=>$(v).textContent=Math.round(parseFloat($(s).value)*100)+" %";$(s).addEventListener("input",f);f();});
+
+/* Préréglages complets (1 clic) */
+const PRESETS=[
+  {name:"Bleu nuit",sky:"#16263f",edge:"#0a1324",star:"#ffffff",starSize:1,lineW:1},
+  {name:"Voie lactée douce",sky:"#1d2b50",edge:"#0b1430",star:"#eef2ff",starSize:1.2,lineW:0.8},
+  {name:"Noir & blanc",sky:"#1a1a1a",edge:"#000000",star:"#ffffff",starSize:0.9,lineW:0.9},
+  {name:"Encre minimaliste",sky:"#223049",edge:"#0d1626",star:"#dfe8f5",starSize:0.8,lineW:0.6},
+];
+const prow=$("#presets");
+PRESETS.forEach(p=>{const b=document.createElement("button");b.className="btn sm";b.style.cssText="background:transparent;color:var(--terra);border:1.5px solid var(--terra);font-size:12px";b.textContent=p.name;
+  b.onclick=()=>{theme={sky:p.sky,edge:p.edge,star:p.star};$("#cSky").value=p.sky;$("#cEdge").value=p.edge;$("#cStar").value=p.star;
+    $("#starSize").value=p.starSize;$("#lineW").value=p.lineW;$("#starSize").dispatchEvent(new Event('input'));$("#lineW").dispatchEvent(new Event('input'));
+    [...sw.children].forEach(c=>c.classList.remove("active"));render();};
+  prow.appendChild(b);});
+
+/* Sous-titre automatique (date + lieu) */
+const MOIS=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+function autoSub(){ if(!$("#subAuto").checked) return;
+  const v=$("#date").value; let s="";
+  if(v){const[y,m,d]=v.split("-").map(Number);s=d+" "+MOIS[m-1]+" "+y;}
+  s=(s?s+" | ":"")+(place.name||"").toUpperCase();
+  $("#tSub").value=s.toUpperCase(); }
+$("#subAuto").addEventListener("change",()=>{ $("#tSub").disabled=$("#subAuto").checked; if($("#subAuto").checked){autoSub();render();} });
+
+/* Déplacement de l'image à la souris + zoom molette */
+let imgDrag=null;
+function cvPos(e){const r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)*(CW/r.width),y:(e.clientY-r.top)*(CH/r.height)};}
+cv.addEventListener("mousedown",e=>{ if(!bgImg)return; imgDrag={...cvPos(e),x0:+$("#bgX").value,y0:+$("#bgY").value}; });
+window.addEventListener("mousemove",e=>{ if(!imgDrag||!bgImg)return;
+  const p=cvPos(e);const z=parseInt($("#bgZoom").value,10)/100;
+  const w=bgImg.width*Math.max(CW/bgImg.width,CH/bgImg.height)*z, h=bgImg.height*Math.max(CW/bgImg.width,CH/bgImg.height)*z;
+  if(w>CW){let pct=imgDrag.x0+(p.x-imgDrag.x)/(CW-w)*100;$("#bgX").value=Math.max(0,Math.min(100,pct));}
+  if(h>CH){let pct=imgDrag.y0+(p.y-imgDrag.y)/(CH-h)*100;$("#bgY").value=Math.max(0,Math.min(100,pct));}
+  $("#bgX").dispatchEvent(new Event('input'));$("#bgY").dispatchEvent(new Event('input'));render(); });
+window.addEventListener("mouseup",()=>imgDrag=null);
+cv.addEventListener("wheel",e=>{ if(!bgImg)return; e.preventDefault();
+  let z=parseInt($("#bgZoom").value,10)+(e.deltaY<0?8:-8);z=Math.max(100,Math.min(400,z));$("#bgZoom").value=z;$("#bgZoom").dispatchEvent(new Event('input'));render(); },{passive:false});
+
+/* Sauvegarde / réouverture du projet */
+function collectState(){const st={place,fields:{}};
+  ["#q","#date","#time","#utc","#utcAuto","#cSky","#cEdge","#cStar","#starSize","#lineW","#showLines","#showNames","#tTitle","#tSub","#subAuto","#titleFont","#textSize","#textY","#showCoords","#showText","#ratio","#quality","#transparent","#bgInt","#bgZoom","#bgX","#bgY","#bgDark"].forEach(id=>{const el=$(id);st.fields[id]=el.type==="checkbox"?el.checked:el.value;});
+  st.theme=theme; st.bg=bgImg?bgImg.src:null; return st;}
+function applyState(st){ if(!st)return;
+  loading=true;
+  place=st.place||place;
+  Object.entries(st.fields||{}).forEach(([id,v])=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=v;else el.value=v;});
+  if(st.theme){theme=st.theme;}
+  $("#utc").disabled=$("#utcAuto").checked;$("#tSub").disabled=$("#subAuto").checked;
+  $("#placeHint").textContent=coordStr();
+  ["#bgInt","#vInt","#bgZoom","#vZoom","#bgX","#vX","#bgY","#vY","#bgDark","#vDark","#textSize","#vText","#textY","#vTextY","#starSize","#vStar","#lineW","#vLine"].forEach(()=>{});
+  document.querySelectorAll('input[type=range]').forEach(r=>r.dispatchEvent(new Event('input')));
+  const finish=()=>{setCanvasSize();loading=false;render();};
+  if(st.bg){const im=new Image();im.onload=()=>{bgImg=im;finish();};im.src=st.bg;} else {bgImg=null;finish();}
+}
+/* ===== Bibliothèque d'affiches (IndexedDB) ===== */
+let PDB=null;
+function openPDB(){return new Promise(res=>{try{const r=indexedDB.open("carteCiel",1);r.onupgradeneeded=e=>e.target.result.createObjectStore("projets",{keyPath:"id"});r.onsuccess=e=>{PDB=e.target.result;res(PDB);};r.onerror=()=>res(null);}catch(e){res(null);}});}
+function pdbPut(o){if(!PDB)return;try{PDB.transaction("projets","readwrite").objectStore("projets").put(o);}catch(e){}}
+function pdbDel(id){if(!PDB)return;try{PDB.transaction("projets","readwrite").objectStore("projets").delete(id);}catch(e){}}
+function pdbAll(){return new Promise(res=>{if(!PDB)return res([]);try{const out=[];const c=PDB.transaction("projets","readonly").objectStore("projets").openCursor();c.onsuccess=e=>{const cur=e.target.result;if(cur){out.push(cur.value);cur.continue();}else res(out);};c.onerror=()=>res([]);}catch(e){res([]);}});}
+function fmtDate(t){try{return new Date(t).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"2-digit"})+" "+new Date(t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});}catch(e){return "";}}
+
+async function renderProjList(){
+  const box=$("#projList");if(!box)return;box.innerHTML="";
+  const all=(await pdbAll()).sort((a,b)=>b.updated-a.updated);
+  if(!all.length){box.innerHTML='<div class="hint" style="margin:0">Aucune affiche enregistrée pour l\'instant.</div>';return;}
+  all.forEach(p=>{const d=document.createElement("div");d.className="proj"+(p.id===curId?" cur":"");
+    d.innerHTML=`<span class="nm">${p.name||"(sans nom)"}</span><span class="dt">${fmtDate(p.updated)}</span><button class="del" title="Supprimer">✕</button>`;
+    d.querySelector(".nm").onclick=()=>loadProj(p.id);
+    d.querySelector(".dt").onclick=()=>loadProj(p.id);
+    d.querySelector(".del").onclick=ev=>{ev.stopPropagation();if(confirm("Supprimer « "+(p.name||"")+" » ?")){pdbDel(p.id);if(curId===p.id){curId=null;curName="";$("#projStatus").textContent="";}renderProjList();}};
+    box.appendChild(d);});
+}
+async function loadProj(id){
+  const all=await pdbAll();const p=all.find(x=>x.id===id);if(!p)return;
+  curId=p.id;curName=p.name;$("#projName").value=p.name;
+  applyState(p.state);
+  $("#projStatus").textContent="Affiche en cours : « "+p.name+" » · enregistrement auto activé";
+  renderProjList();
+}
+function saveProjAs(name){
+  if(!name){alert("Donnez un nom à l'affiche.");return;}
+  // si une affiche du même nom existe, on la met à jour
+  pdbAll().then(all=>{
+    const ex=all.find(x=>x.name===name);
+    curId = ex? ex.id : Date.now();
+    curName=name;
+    pdbPut({id:curId,name,updated:Date.now(),state:collectState()});
+    $("#projStatus").textContent="Affiche en cours : « "+name+" » · enregistrement auto activé";
+    renderProjList();
+  });
+}
+function scheduleAutosave(){
+  if(loading||!curId)return;
+  clearTimeout(autoTimer);
+  autoTimer=setTimeout(()=>{ pdbPut({id:curId,name:curName,updated:Date.now(),state:collectState()}); $("#projStatus").textContent="« "+curName+" » · enregistré ✓ ("+fmtDate(Date.now())+")"; renderProjList(); },700);
+}
+$("#projSave").onclick=()=>saveProjAs($("#projName").value.trim());
+
+/* Export / Import fichier (secours, transfert entre ordis) */
+$("#projExport").onclick=()=>{const data=JSON.stringify({name:curName||$("#projName").value||"affiche",state:collectState()});const b=new Blob([data],{type:"application/json"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="affiche-ciel-"+((curName||$("#tTitle").value||"ciel").replace(/[^\w]+/g,"-"))+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);};
+$("#projImport").onclick=()=>$("#projFile").click();
+$("#projFile").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{const j=JSON.parse(await f.text());const st=j.state||j;applyState(st);if(j.name){$("#projName").value=j.name;saveProjAs(j.name);}}catch(err){alert("Fichier illisible.");}};
+
+(async()=>{ await openPDB(); if(!PDB){$("#projHint").textContent="Sauvegarde navigateur indisponible ici (Chrome local) : utilisez Exporter/Importer, ou ouvrez avec Firefox / la version en ligne.";} renderProjList(); })();
+$("#loadBg").onclick=()=>$("#bgFile").click();
+$("#bgFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{bgImg=im;render();};im.src=URL.createObjectURL(f);e.target.value="";};
+$("#clearBg").onclick=()=>{bgImg=null;render();};
+["#date","#time"].forEach(id=>{const el=$(id);el.addEventListener("input",recalc);el.addEventListener("change",recalc);});
+$("#utcAuto").addEventListener("change",()=>{ $("#utc").disabled=$("#utcAuto").checked; if($("#utcAuto").checked){$("#tzHint").textContent="Le décalage est déterminé automatiquement selon le lieu et la date.";recalc();} else {$("#tzHint").textContent="Mode manuel : réglez le décalage UTC (France : 1 hiver, 2 été).";} });
+$("#ratio").onchange=setCanvasSize;
+
+/* recherche lieu */
+let acTimer=null;
+$("#searchBtn").onclick=()=>doSearch($("#q").value.trim());
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"){clearTimeout(acTimer);doSearch($("#q").value.trim());}});
+$("#q").addEventListener("input",()=>{clearTimeout(acTimer);const v=$("#q").value.trim();if(v.length<3){$("#results").innerHTML="";return;}acTimer=setTimeout(()=>doSearch(v),350);});
+async function doSearch(q){if(!q)return;const ul=$("#results");ul.innerHTML="<li>Recherche…</li>";
+  try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=6&q="+encodeURIComponent(q),{headers:{"Accept-Language":"fr"}});
+    const data=await r.json();ul.innerHTML="";if(!data.length){ul.innerHTML="<li>Aucun résultat</li>";return;}
+    data.forEach(d=>{const li=document.createElement("li");li.textContent=d.display_name;
+      li.onclick=()=>{place={lat:+d.lat,lng:+d.lon,name:d.display_name.split(",")[0]};$("#placeHint").textContent=coordStr();ul.innerHTML="";$("#q").value=place.name;recalc();};
+      ul.appendChild(li);});
+  }catch(e){ul.innerHTML="<li>Erreur réseau</li>";}}
+
+/* export */
+$("#exportBtn").onclick=()=>{
+  const r=(()=>{const[a,b]=$("#ratio").value.split(":").map(Number);return a/b;})();
+  const long=parseInt($("#quality").value,10);let W,H;if(r>=1){W=long;H=Math.round(long/r);}else{H=long;W=Math.round(long*r);}
+  const out=document.createElement("canvas");out.width=W;out.height=H;
+  draw(out.getContext("2d"),W,H,W/CW);
+  out.toBlob(b=>{const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download="carte-ciel-"+(($("#tTitle").value||"ciel").replace(/[^\w]+/g,"-"))+".png";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);},"image/png");
+};
+
+/* init */
+(function initDate(){const t=new Date();$("#date").value=t.toISOString().slice(0,10);$("#placeHint").textContent=coordStr();$("#utc").disabled=$("#utcAuto").checked;autoUTC();})();
+setCanvasSize();
+</script>
+</body>
+</html>
