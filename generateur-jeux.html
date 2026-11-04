@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Générateur de Jeux — Mon Petit Event</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#f3ece6; --panel:#fbf7f3; --ink:#2b231d; --muted:#8a7a6c;
+    --terra:#7d4c27; --terra-soft:#cfa98d; --line:#e2d5c9; --accent:#c0392b;
+    --radius:12px; --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+    /* palette produit (modifiable par l'utilisatrice) */
+    --p-ink:#2b231d; --p-accent:#9c2b2b; --p-soft:#f3ece6; --p-line:#d9c7b6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+  h1,h2,h3{margin:0;text-wrap:balance}
+  button,input,select,textarea{font-family:inherit}
+  .app{display:grid;grid-template-columns:340px 1fr;height:100%}
+  @media(max-width:900px){.app{grid-template-columns:1fr;height:auto}}
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:16px;overflow:auto}
+  .side h1{font-size:18px}.side .sub{color:var(--muted);font-size:12px;margin:2px 0 14px}
+  .grp{margin-bottom:16px;border-top:1px solid var(--line);padding-top:12px}
+  .grp:first-of-type{border-top:none;padding-top:0}
+  .grp h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--terra);margin:0 0 8px}
+  label.fld{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+  input[type=text],input[type=number],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--ink)}
+  textarea{resize:vertical;line-height:1.45}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .colors{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .cfld{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff}
+  input[type=color]{width:34px;height:24px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;padding:0}
+  .btn{border:none;background:var(--terra);color:#fff;padding:9px 13px;border-radius:9px;font-weight:600;cursor:pointer;font-size:13px}
+  .btn:hover{background:#633a1d}
+  .btn.ghost{background:transparent;color:var(--terra);border:1.5px solid var(--terra)}
+  .btn.ghost:hover{background:#efe3d8}
+  .btn.sm{padding:6px 10px;font-size:12px}
+  .btn.block{width:100%;margin-top:6px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .glist{display:flex;flex-direction:column;gap:5px;margin-top:8px;max-height:300px;overflow:auto;padding-right:2px}
+  .gitem{display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:12px}
+  .gitem:hover{background:#efe3d8}
+  .gitem.cur{border-color:var(--terra);background:#f3e7db}
+  .gitem .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gitem .cat{font-size:9px;padding:1px 6px;border-radius:20px;color:#fff;white-space:nowrap}
+  .cat-impr{background:#5a7d4c}.cat-amb{background:#9c2b2b}.cat-enf{background:#c47f2a}
+  .gitem .mv{border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px}
+  .gitem .mv:hover{color:var(--terra)}
+  .count{font-size:11px;color:var(--muted);margin-top:6px}
+  .main{position:relative;min-height:70vh;overflow:auto;padding:18px;background:#e9ded3}
+  .toolbar{position:sticky;top:0;z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .toolbar .status{font-size:12px;color:var(--muted);margin-left:auto}
+  .pages{display:flex;flex-direction:column;align-items:center;gap:18px}
+  /* page A4 : 210x297mm -> 794x1123px @96dpi */
+  .page{width:794px;height:1123px;background:#fff;box-shadow:0 3px 18px rgba(0,0,0,.18);position:relative;overflow:hidden;flex:none}
+  @media(max-width:900px){.page{transform:scale(.92);transform-origin:top center}}
+  .pg-pad{position:absolute;inset:52px 56px}
+  /* --- styles de contenu produit --- */
+  .pcover{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:18px;background:var(--p-soft)}
+  .pcover .kicker{letter-spacing:.32em;text-transform:uppercase;font-size:15px;color:var(--p-accent);font-weight:600}
+  .pcover h1{font-size:54px;line-height:1.08;color:var(--p-ink);font-weight:800;max-width:560px}
+  .pcover .sub{font-size:19px;color:var(--p-ink);opacity:.72;max-width:480px}
+  .pcover .rule{width:90px;height:4px;background:var(--p-accent);border-radius:3px}
+  .pcover .foot{position:absolute;bottom:52px;left:0;right:0;text-align:center;font-size:13px;color:var(--p-ink);opacity:.55}
+  .ghead{border-bottom:3px solid var(--p-accent);padding-bottom:12px;margin-bottom:22px}
+  .ghead .idx{font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--p-accent);font-weight:700}
+  .ghead h2{font-size:30px;color:var(--p-ink);margin-top:4px;font-weight:800}
+  .ghead .instr{font-size:15px;color:var(--p-ink);opacity:.75;margin-top:8px}
+  .gbody{font-size:16px;color:var(--p-ink)}
+  .gbody ol,.gbody ul{margin:0;padding-left:22px}
+  .gbody li{margin-bottom:12px;line-height:1.5}
+  .gbody .qa b{color:var(--p-accent)}
+  .grid-ws{display:grid;gap:3px;justify-content:center;margin:6px auto 22px;font-family:ui-monospace,Consolas,monospace;font-weight:600}
+  .grid-ws .cell{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--p-line);font-size:16px;color:var(--p-ink);background:#fff;border-radius:3px}
+  .wordlist{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 14px;margin-top:10px;font-size:14px;color:var(--p-ink)}
+  .wordlist span{padding:2px 0;border-bottom:1px dotted var(--p-line)}
+  .twocol{columns:2;column-gap:34px}
+  .twocol li{break-inside:avoid}
+  .cardgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+  .ccard{border:2px dashed var(--p-line);border-radius:12px;padding:16px 18px;min-height:120px;color:var(--p-ink)}
+  .ccard .ct{font-weight:700;color:var(--p-accent);font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+  .ccard .cx{font-size:15px}
+  .colorframe{border:2px solid var(--p-line);border-radius:14px;height:720px;display:grid;place-items:center;color:var(--p-line);text-align:center;margin-top:6px}
+  .colorframe span{font-size:17px;max-width:360px}
+  .pgnum{position:absolute;bottom:26px;right:56px;font-size:12px;color:var(--p-ink);opacity:.5}
+  .pgnum.l{left:56px;right:auto}
+  .brandfoot{position:absolute;bottom:24px;left:0;right:0;text-align:center;font-size:11px;color:var(--p-ink);opacity:.4}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4}
+  .editor{display:none;position:fixed;inset:0;background:rgba(43,35,29,.5);z-index:100;align-items:center;justify-content:center;padding:20px}
+  .editor.open{display:flex}
+  .ebox{background:var(--panel);border-radius:14px;padding:20px;width:560px;max-width:100%;max-height:90vh;overflow:auto}
+  .ebox h3{font-size:16px;color:var(--terra);margin-bottom:12px}
+  .ebox .hint{margin-bottom:10px}
+  .ebar{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .pct{height:5px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:8px;display:none}
+  .pct.on{display:block}.pct i{display:block;height:100%;width:0;background:var(--terra);transition:width .2s}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1>Générateur de Jeux</h1>
+    <div class="sub">Mon Petit Event — contenu, mise en page, export PDF &amp; JPG</div>
+
+    <div class="grp">
+      <h2>1 · Le pack</h2>
+      <label class="fld">Titre</label>
+      <input type="text" id="pkTitle" value="35 Jeux de Noël">
+      <label class="fld">Sous-titre</label>
+      <input type="text" id="pkSub" value="Le pack à imprimer pour animer toutes vos fêtes">
+      <label class="fld">Mention de pied de page</label>
+      <input type="text" id="pkFoot" value="Mon Petit Event France — usage personnel">
+    </div>
+
+    <div class="grp">
+      <h2>2 · Couleurs</h2>
+      <div class="colors">
+        <label class="cfld">Accent <input type="color" id="cAccent" value="#9c2b2b"></label>
+        <label class="cfld">Texte <input type="color" id="cInk" value="#2b231d"></label>
+        <label class="cfld">Fond couv. <input type="color" id="cSoft" value="#f3ece6"></label>
+        <label class="cfld">Traits <input type="color" id="cLine" value="#d9c7b6"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost sm" data-theme="noel">Noël</button>
+        <button class="btn ghost sm" data-theme="vert">Sapin</button>
+        <button class="btn ghost sm" data-theme="or">Or &amp; nuit</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h2>3 · Les jeux <span id="gCount" class="badge"></span></h2>
+      <div class="glist" id="glist"></div>
+      <div class="count" id="countLine"></div>
+      <button class="btn block" id="addGame">+ Ajouter un jeu</button>
+    </div>
+
+    <div class="grp">
+      <h2>4 · Données</h2>
+      <div class="row">
+        <button class="btn ghost sm" id="exportJson">Exporter .json</button>
+        <button class="btn ghost sm" id="importJsonBtn">Importer .json</button>
+        <input type="file" id="importJson" accept=".json" hidden>
+      </div>
+      <div class="hint">Le .json sauvegarde tout le pack. Gardez-le pour rééditer plus tard ou me le renvoyer.</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <button class="btn" id="btnPdf">Télécharger le PDF</button>
+      <button class="btn ghost" id="btnZip">Télécharger les JPG (ZIP)</button>
+      <label class="fld" style="margin:0 0 0 4px">Qualité export
+        <select id="dpi" style="width:auto;display:inline-block;margin-left:4px">
+          <option value="1.6">Standard</option>
+          <option value="2" selected>Haute</option>
+          <option value="2.6">Impression</option>
+        </select>
+      </label>
+      <span class="status" id="status">Prêt.</span>
+      <div class="pct" id="pct" style="flex-basis:100%"><i></i></div>
+    </div>
+    <div class="pages" id="pages"></div>
+  </main>
+</div>
+
+<!-- éditeur de jeu -->
+<div class="editor" id="editor">
+  <div class="ebox">
+    <h3 id="eTitle">Modifier le jeu</h3>
+    <label class="fld">Catégorie</label>
+    <select id="eCat">
+      <option value="impr">À imprimer</option>
+      <option value="amb">Ambiance / animation</option>
+      <option value="enf">Enfants</option>
+    </select>
+    <label class="fld">Type de rendu</label>
+    <select id="eType">
+      <option value="liste">Liste numérotée (énigmes, défis…)</option>
+      <option value="qa">Questions / Réponses (quiz)</option>
+      <option value="motsmeles">Mots mêlés (grille auto)</option>
+      <option value="cartes">Cartes à découper</option>
+      <option value="coloriage">Page à colorier / dessiner</option>
+      <option value="texte">Texte libre</option>
+    </select>
+    <label class="fld">Titre du jeu</label>
+    <input type="text" id="eName">
+    <label class="fld">Consigne</label>
+    <input type="text" id="eInstr">
+    <label class="fld" id="eContentLbl">Contenu <span style="text-transform:none;font-weight:400"></span></label>
+    <textarea id="eContent" rows="9"></textarea>
+    <div class="hint" id="eHint"></div>
+    <div class="ebar">
+      <button class="btn ghost" id="eDelete">Supprimer</button>
+      <button class="btn ghost" id="eCancel">Annuler</button>
+      <button class="btn" id="eSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+/* ---------- données de départ : vrai pack de Noël ---------- */
+const SEED = {
+  title:"35 Jeux de Noël", sub:"Le pack à imprimer pour animer toutes vos fêtes",
+  foot:"Mon Petit Event France — usage personnel",
+  colors:{accent:"#9c2b2b",ink:"#2b231d",soft:"#f3ece6",line:"#d9c7b6"},
+  games:[
+    {cat:"amb",type:"qa",name:"Grand quiz de Noël",instr:"Lisez la question à voix haute. Le premier à répondre marque un point.",content:
+"Dans quel pays la tradition du sapin de Noël est-elle née ? | En Allemagne\nComment s'appellent les rennes du Père Noël en tête de l'attelage ? | Tornade, Danseur, Furie et les autres (le plus connu reste Rudolphe)\nQuelle épice parfume traditionnellement le vin chaud ? | La cannelle\nDe quelle couleur était le costume du Père Noël avant d'être rouge ? | Vert\nDans quelle ville se trouve le marché de Noël le plus célèbre de France ? | Strasbourg\nQuel personnage déteste Noël dans le conte de Dickens ? | Ebenezer Scrooge\nCombien de cadeaux offre-t-on dans la chanson Les douze jours de Noël ? | 364 au total\nQue laisse-t-on traditionnellement au pied du sapin pour le Père Noël ? | Un verre de lait et des biscuits"},
+    {cat:"impr",type:"motsmeles",name:"Mots mêlés de l'hiver",instr:"Retrouvez et entourez les 10 mots cachés dans la grille.",content:
+"SAPIN\nETOILE\nTRAINEAU\nCADEAU\nBOUGIE\nFLOCON\nGUIRLANDE\nHOUX\nRENNE\nCHEMINEE"},
+    {cat:"amb",type:"liste",name:"Défis de la soirée",instr:"Tirez un défi au sort. Celui qui refuse a un gage.",content:
+"Chantez le refrain de Petit Papa Noël en imitant une chorale.\nDécrivez votre plus beau souvenir de Noël en trente secondes.\nFaites deviner « bonhomme de neige » en mime, sans parler.\nProposez un toast original pour toute la table.\nImitez le Père Noël qui a trop mangé au réveillon.\nTrouvez trois mots qui riment avec « cadeau ».\nRaconte une blague de Noël à toute la tablée.\nFais la liste de cinq choses que tu aimerais trouver sous le sapin."},
+    {cat:"enf",type:"coloriage",name:"Mon sapin à décorer",instr:"Colorie le sapin et ajoute tes propres décorations.",content:
+"Espace à colorier — ajoutez ici votre illustration de sapin avant la vente."},
+    {cat:"amb",type:"cartes",name:"Qui suis-je ? spécial Noël",instr:"Collez une carte sur le front de chaque joueur. Posez des questions pour deviner qui vous êtes.",content:
+"Le Père Noël | Je distribue les cadeaux dans la nuit du 24.\nRudolphe | J'ai un nez rouge qui brille dans la nuit.\nLe bonhomme de neige | Je fonds quand il fait trop chaud.\nLa bûche | On me mange en dessert à la fin du repas.\nLe sapin | On me décore avec des boules et des guirlandes.\nLe lutin | Je fabrique les jouets dans l'atelier du Grand Nord.\nLa cloche | Je sonne dans les églises le soir de Noël.\nLe casse-noisette | Je suis un soldat de bois dans un célèbre ballet."},
+    {cat:"impr",type:"liste",name:"Énigmes au coin du feu",instr:"Lisez l'énigme. La réponse est au bas de la page (à l'envers avant impression).",content:
+"Je brille en haut du sapin mais je ne suis pas une boule. Qui suis-je ? (l'étoile)\nPlus je suis vieux, plus on me décore. Qui suis-je ? (le sapin)\nJe tombe du ciel en silence et je recouvre tout de blanc. Qui suis-je ? (la neige)\nJe voyage en une nuit tout autour du monde. Qui suis-je ? (le Père Noël)\nJe suis emballé, je suis attendu, et parfois je fais du bruit quand on me secoue. Qui suis-je ? (le cadeau)"},
+    {cat:"enf",type:"liste",name:"Cherche et trouve",instr:"Dans l'image de Noël, retrouve chacun de ces éléments.",content:
+"3 boules rouges\n2 cannes en sucre\n1 étoile filante\n4 flocons de neige\n1 lutin caché\n2 bougies allumées\n1 paire de chaussettes\n1 ourson en peluche"},
+    {cat:"amb",type:"qa",name:"Vrai ou faux de Noël",instr:"Annoncez l'affirmation. Chacun répond vrai ou faux.",content:
+"Le gui se suspend pour s'embrasser dessous. | Vrai\nLe Père Noël vient du pôle Sud. | Faux, du pôle Nord\nLa dinde est un plat traditionnel du réveillon. | Vrai\nLes rennes du Père Noël sont au nombre de six. | Faux, ils sont neuf avec Rudolphe\nLa première carte de Noël a été envoyée au XIXe siècle. | Vrai\nLe calendrier de l'Avent compte trente jours. | Faux, vingt-quatre"},
+    {cat:"impr",type:"liste",name:"Le juste prix du réveillon",instr:"Estimez le prix de chaque élément. Le plus proche gagne.",content:
+"Un sapin naturel d'un mètre cinquante\nUne bûche pâtissière pour huit personnes\nUne guirlande lumineuse de dix mètres\nUn kilo de marrons glacés\nUne boîte de six boules artisanales"},
+    {cat:"enf",type:"liste",name:"Relie les points de Noël",instr:"Relie les chiffres dans l'ordre pour découvrir le dessin surprise.",content:
+"Espace à illustrer — placez ici votre tracé points-à-relier avant la vente."}
+  ]
+};
+
+/* ---------- état ---------- */
+let state = JSON.parse(JSON.stringify(SEED));
+let curIdx = -1;
+
+/* ---------- utilitaires ---------- */
+const CATLABEL={impr:"À imprimer",amb:"Ambiance",enf:"Enfants"};
+const CATCLS={impr:"cat-impr",amb:"cat-amb",enf:"cat-enf"};
+function setStatus(t){ $("#status").textContent=t; }
+function applyColors(){
+  const c=state.colors, r=document.documentElement.style;
+  r.setProperty("--p-accent",c.accent); r.setProperty("--p-ink",c.ink);
+  r.setProperty("--p-soft",c.soft); r.setProperty("--p-line",c.line);
+}
+
+/* ---------- générateur de grille de mots mêlés ---------- */
+function buildWordSearch(words){
+  words = words.map(w=>w.replace(/[^A-Za-zÀ-ÿ]/g,"").toUpperCase()).filter(Boolean);
+  const maxLen = words.reduce((m,w)=>Math.max(m,w.length),0);
+  const size = Math.max(12, Math.min(16, maxLen+2));
+  const grid = Array.from({length:size},()=>Array(size).fill(""));
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  function place(w){
+    for(let t=0;t<200;t++){
+      const d=dirs[Math.floor(Math.random()*dirs.length)];
+      const r0=Math.floor(Math.random()*size), c0=Math.floor(Math.random()*size);
+      const rN=r0+d[0]*(w.length-1), cN=c0+d[1]*(w.length-1);
+      if(rN<0||rN>=size||cN<0||cN>=size) continue;
+      let ok=true;
+      for(let i=0;i<w.length;i++){const r=r0+d[0]*i,c=c0+d[1]*i;const g=grid[r][c];if(g&&g!==w[i]){ok=false;break;}}
+      if(!ok) continue;
+      for(let i=0;i<w.length;i++){const r=r0+d[0]*i,c=c0+d[1]*i;grid[r][c]=w[i];}
+      return true;
+    }
+    return false;
+  }
+  const placed=[];
+  words.sort((a,b)=>b.length-a.length).forEach(w=>{ if(place(w)) placed.push(w); });
+  const A="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++) if(!grid[r][c]) grid[r][c]=A[Math.floor(Math.random()*26)];
+  return {grid,size,words:placed};
+}
+
+/* ---------- rendu d'un jeu en HTML ---------- */
+function renderGameBody(g){
+  const lines = (g.content||"").split("\n").map(l=>l.trim()).filter(Boolean);
+  if(g.type==="qa"){
+    const items=lines.map(l=>{const [q,a]=l.split("|");return `<li class="qa"><b>${esc((q||"").trim())}</b><br><span style="opacity:.75">Réponse : ${esc((a||"").trim())}</span></li>`;}).join("");
+    return `<div class="gbody"><ol>${items}</ol></div>`;
+  }
+  if(g.type==="cartes"){
+    const cards=lines.map(l=>{const [t,x]=l.split("|");return `<div class="ccard"><div class="ct">${esc((t||"").trim())}</div><div class="cx">${esc((x||"").trim())}</div></div>`;}).join("");
+    return `<div class="cardgrid">${cards}</div>`;
+  }
+  if(g.type==="motsmeles"){
+    const ws=buildWordSearch(lines);
+    const cells=ws.grid.map(row=>row.map(ch=>`<div class="cell">${ch}</div>`).join("")).join("");
+    const wl=ws.words.map(w=>`<span>${esc(w)}</span>`).join("");
+    return `<div class="grid-ws" style="grid-template-columns:repeat(${ws.size},30px)">${cells}</div>
+      <div style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-accent);font-weight:700;margin-bottom:6px">Mots à trouver</div>
+      <div class="wordlist">${wl}</div>`;
+  }
+  if(g.type==="coloriage"){
+    return `<div class="colorframe"><span>${esc(lines.join(" ")||"Zone à colorier")}</span></div>`;
+  }
+  if(g.type==="texte"){
+    return `<div class="gbody"><p>${lines.map(esc).join("<br>")}</p></div>`;
+  }
+  // liste par défaut
+  const cls = lines.length>6 ? "twocol" : "";
+  return `<div class="gbody"><ol class="${cls}">${lines.map(l=>`<li>${esc(l)}</li>`).join("")}</ol></div>`;
+}
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+/* ---------- rendu des pages A4 ---------- */
+function renderPages(){
+  const host=$("#pages"); host.innerHTML="";
+  // couverture
+  const cover=document.createElement("div");
+  cover.className="page";
+  cover.innerHTML=`<div class="pg-pad pcover">
+      <div class="kicker">Mon Petit Event</div>
+      <h1>${esc(state.title)}</h1>
+      <div class="rule"></div>
+      <div class="sub">${esc(state.sub)}</div>
+      <div class="foot">${esc(state.foot)}</div>
+    </div>`;
+  host.appendChild(cover);
+  // une page par jeu
+  state.games.forEach((g,i)=>{
+    const p=document.createElement("div"); p.className="page";
+    p.innerHTML=`<div class="pg-pad">
+        <div class="ghead">
+          <div class="idx">Jeu ${i+1} · ${CATLABEL[g.cat]||""}</div>
+          <h2>${esc(g.name)}</h2>
+          <div class="instr">${esc(g.instr)}</div>
+        </div>
+        ${renderGameBody(g)}
+      </div>
+      <div class="pgnum ${i%2?'':'l'}">${esc(state.title)} · ${i+2}</div>
+      <div class="brandfoot">${esc(state.foot)}</div>`;
+    host.appendChild(p);
+  });
+}
+
+/* ---------- panneau latéral : liste ---------- */
+function renderList(){
+  const host=$("#glist"); host.innerHTML="";
+  state.games.forEach((g,i)=>{
+    const d=document.createElement("div");
+    d.className="gitem"+(i===curIdx?" cur":"");
+    d.innerHTML=`<span class="cat ${CATCLS[g.cat]}">${CATLABEL[g.cat]}</span>
+      <span class="nm">${esc(g.name)}</span>
+      <button class="mv" data-up="${i}" title="Monter">▲</button>
+      <button class="mv" data-down="${i}" title="Descendre">▼</button>`;
+    d.querySelector(".nm").onclick=()=>openEditor(i);
+    d.querySelector(".cat").onclick=()=>openEditor(i);
+    host.appendChild(d);
+  });
+  $$("[data-up]").forEach(b=>b.onclick=e=>{e.stopPropagation();move(+b.dataset.up,-1);});
+  $$("[data-down]").forEach(b=>b.onclick=e=>{e.stopPropagation();move(+b.dataset.down,1);});
+  const n=state.games.length;
+  $("#countLine").textContent=`${n} jeu${n>1?"x":""} dans le pack`+(n<35?` · ${35-n} pour atteindre 35`:"");
+}
+function move(i,dir){
+  const j=i+dir; if(j<0||j>=state.games.length) return;
+  [state.games[i],state.games[j]]=[state.games[j],state.games[i]];
+  renderAll();
+}
+
+/* ---------- éditeur ---------- */
+const HINTS={
+  liste:"Une entrée par ligne.",
+  qa:"Une ligne par question. Format : Question | Réponse",
+  motsmeles:"Un mot par ligne (les accents sont ignorés dans la grille). La grille est générée automatiquement.",
+  cartes:"Une carte par ligne. Format : Titre | Description",
+  coloriage:"Texte affiché dans le cadre. L'illustration se place ensuite dans la maquette.",
+  texte:"Texte libre, un paragraphe par ligne."
+};
+function openEditor(i){
+  curIdx=i; const g=state.games[i];
+  $("#eTitle").textContent="Modifier · "+g.name;
+  $("#eCat").value=g.cat; $("#eType").value=g.type;
+  $("#eName").value=g.name; $("#eInstr").value=g.instr; $("#eContent").value=g.content;
+  $("#eHint").textContent=HINTS[g.type]||"";
+  $("#editor").classList.add("open"); renderList();
+}
+function newGame(){
+  state.games.push({cat:"amb",type:"liste",name:"Nouveau jeu",instr:"Consigne du jeu.",content:"Première entrée\nDeuxième entrée"});
+  openEditor(state.games.length-1); renderAll();
+}
+$("#eType").onchange=()=>$("#eHint").textContent=HINTS[$("#eType").value]||"";
+$("#eSave").onclick=()=>{
+  const g=state.games[curIdx];
+  g.cat=$("#eCat").value; g.type=$("#eType").value;
+  g.name=$("#eName").value.trim()||"Jeu sans titre";
+  g.instr=$("#eInstr").value.trim(); g.content=$("#eContent").value;
+  $("#editor").classList.remove("open"); renderAll();
+};
+$("#eCancel").onclick=()=>$("#editor").classList.remove("open");
+$("#eDelete").onclick=()=>{ state.games.splice(curIdx,1); curIdx=-1; $("#editor").classList.remove("open"); renderAll(); };
+$("#addGame").onclick=newGame;
+
+/* ---------- liaison des champs du pack ---------- */
+function bind(id,key){ $(id).oninput=()=>{state[key]=$(id).value; renderPages();}; }
+bind("#pkTitle","title"); bind("#pkSub","sub"); bind("#pkFoot","foot");
+["accent|cAccent","ink|cInk","soft|cSoft","line|cLine"].forEach(pair=>{
+  const [k,id]=pair.split("|");
+  $("#"+id).oninput=()=>{ state.colors[k]=$("#"+id).value; applyColors(); };
+});
+const THEMES={
+  noel:{accent:"#9c2b2b",ink:"#2b231d",soft:"#f3ece6",line:"#d9c7b6"},
+  vert:{accent:"#2f5d3a",ink:"#20302a",soft:"#eef3ec",line:"#c3d4c1"},
+  or:{accent:"#b8893b",ink:"#1c2233",soft:"#f4efe3",line:"#d8cba8"}
+};
+$$("[data-theme]").forEach(b=>b.onclick=()=>{
+  state.colors={...THEMES[b.dataset.theme]};
+  $("#cAccent").value=state.colors.accent;$("#cInk").value=state.colors.ink;
+  $("#cSoft").value=state.colors.soft;$("#cLine").value=state.colors.line;
+  applyColors();
+});
+
+/* ---------- import / export json ---------- */
+$("#exportJson").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  dl(blob,(slug(state.title)||"pack")+".json");
+};
+$("#importJsonBtn").onclick=()=>$("#importJson").click();
+$("#importJson").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ state=JSON.parse(rd.result); fillForm(); renderAll(); setStatus("Pack importé."); }catch(err){ alert("Fichier .json invalide."); } };
+  rd.readAsText(f); e.target.value="";
+};
+function fillForm(){
+  $("#pkTitle").value=state.title; $("#pkSub").value=state.sub; $("#pkFoot").value=state.foot;
+  $("#cAccent").value=state.colors.accent;$("#cInk").value=state.colors.ink;
+  $("#cSoft").value=state.colors.soft;$("#cLine").value=state.colors.line;
+}
+
+/* ---------- export PDF / JPG ---------- */
+async function snap(page,scale){
+  return await html2canvas(page,{scale,backgroundColor:"#ffffff",useCORS:true,logging:false});
+}
+function progress(on,v){ const p=$("#pct"); p.classList.toggle("on",on); p.querySelector("i").style.width=(v||0)+"%"; }
+
+$("#btnPdf").onclick=async()=>{
+  const pages=$$(".page"); const scale=+$("#dpi").value;
+  setStatus("Génération du PDF…"); progress(true,0); lockBtns(true);
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:"px",format:[794,1123],compress:true});
+    for(let i=0;i<pages.length;i++){
+      const cv=await snap(pages[i],scale);
+      const img=cv.toDataURL("image/jpeg",0.92);
+      if(i>0) pdf.addPage([794,1123],"portrait");
+      pdf.addImage(img,"JPEG",0,0,794,1123);
+      progress(true,Math.round((i+1)/pages.length*100)); setStatus(`Page ${i+1}/${pages.length}…`);
+    }
+    pdf.save((slug(state.title)||"pack")+".pdf");
+    setStatus("PDF téléchargé.");
+  }catch(err){ console.error(err); setStatus("Erreur PDF : "+err.message); }
+  progress(false,0); lockBtns(false);
+};
+
+$("#btnZip").onclick=async()=>{
+  const pages=$$(".page"); const scale=+$("#dpi").value;
+  setStatus("Génération des JPG…"); progress(true,0); lockBtns(true);
+  try{
+    const zip=new JSZip(); const base=slug(state.title)||"pack";
+    for(let i=0;i<pages.length;i++){
+      const cv=await snap(pages[i],scale);
+      const data=cv.toDataURL("image/jpeg",0.92).split(",")[1];
+      const name=i===0?`${base}_00_couverture.jpg`:`${base}_${String(i).padStart(2,"0")}.jpg`;
+      zip.file(name,data,{base64:true});
+      progress(true,Math.round((i+1)/pages.length*100)); setStatus(`Image ${i+1}/${pages.length}…`);
+    }
+    const blob=await zip.generateAsync({type:"blob"});
+    dl(blob,base+"_jpg.zip");
+    setStatus("ZIP téléchargé.");
+  }catch(err){ console.error(err); setStatus("Erreur ZIP : "+err.message); }
+  progress(false,0); lockBtns(false);
+};
+function lockBtns(v){ $("#btnPdf").disabled=v; $("#btnZip").disabled=v; }
+function dl(blob,name){ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+function slug(s){ return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""); }
+
+/* ---------- init ---------- */
+function renderAll(){ applyColors(); renderPages(); renderList(); $("#gCount").textContent=state.games.length; }
+renderAll();
+setStatus("Prêt. "+state.games.length+" jeux chargés.");
+</script>
+</body>
+</html>
